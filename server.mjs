@@ -2,6 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { collect } from './lib/collect.mjs';
+import { fetchPlanUsage } from './lib/plan.mjs';
 
 const PORT = Number(process.env.PORT || 3450);
 const PUBLIC_DIR = path.join(import.meta.dirname, 'public');
@@ -17,6 +18,7 @@ const MIME = {
 };
 
 let cache = null;
+let planCache = { at: 0, data: null };
 
 function sendJson(res, status, body) {
   res.writeHead(status, {
@@ -55,6 +57,18 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 200, cache);
     } catch (err) {
       sendJson(res, 500, { error: String(err?.message || err) });
+    }
+    return;
+  }
+
+  if (url.pathname === '/api/plan') {
+    try {
+      if (!planCache.data || Date.now() - planCache.at > 60_000 || url.searchParams.get('refresh') === '1') {
+        planCache = { at: Date.now(), data: await fetchPlanUsage() };
+      }
+      sendJson(res, 200, planCache.data);
+    } catch (err) {
+      sendJson(res, 200, { available: false, error: String(err?.message || err) });
     }
     return;
   }

@@ -16,6 +16,10 @@ const state = {
   hourlyChart: null,
   modelChart: null,
   sourceChart: null,
+  plan: null,
+  planSelectedDate: null,
+  planDailyChart: null,
+  planHourlyChart: null,
 };
 
 // ---------- utils ----------
@@ -275,6 +279,130 @@ function setSelectedDate(date) {
   renderHourlyChart();
 }
 
+// ---------- plan (계정 기반, 전체 머신 합산) ----------
+const PLAN_COLOR = '#06b6d4';
+
+function planByDate() {
+  const m = new Map();
+  for (const b of state.plan.buckets) {
+    const d = new Date(b.ts);
+    const key = dateKey(d);
+    const cur = m.get(key) ?? { tokens: 0, calls: 0, hours: Array.from({ length: 24 }, () => ({ tokens: 0, calls: 0 })) };
+    cur.tokens += b.tokens;
+    cur.calls += b.calls;
+    cur.hours[d.getHours()].tokens += b.tokens;
+    cur.hours[d.getHours()].calls += b.calls;
+    m.set(key, cur);
+  }
+  return [...m.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+}
+
+function renderPlan() {
+  const p = state.plan;
+  const panel = document.getElementById('plan-panel');
+  if (!p || !p.available) {
+    panel.hidden = true;
+    return;
+  }
+  panel.hidden = false;
+
+  const byDate = planByDate();
+  const today = dateKey(new Date());
+  const todayData = byDate.find(([d]) => d === today)?.[1];
+  const resetAt = p.quota.tokensResetAt ? new Date(p.quota.tokensResetAt) : null;
+  const minsLeft = resetAt ? Math.max(0, Math.round((resetAt - Date.now()) / 60000)) : null;
+
+  const cards = [
+    ['플랜', p.quota.planLevel ? p.quota.planLevel.toUpperCase() : '-', `최근 ${p.days}일 ${fmtCompact(p.totals.tokens)} tok`],
+    ['5h 윈도우', `${p.quota.tokensPercentage ?? '-'}%`, minsLeft != null ? `리셋 ${Math.floor(minsLeft / 60)}시간 ${minsLeft % 60}분 후` : ''],
+    ['오늘 · 계정 기준', todayData ? fmtCompact(todayData.tokens) : '0', `${fmt(todayData?.calls ?? 0)} 호출 (모든 머신 합산)`],
+  ];
+  document.getElementById('plan-cards').innerHTML = cards
+    .map(([label, value, sub]) => `
+      <div class="card">
+        <div class="label">${label}</div>
+        <div class="value" style="color:${PLAN_COLOR}">${value}</div>
+        <div class="sub">${sub}</div>
+      </div>`)
+    .join('');
+  document.getElementById('plan-meta').textContent = `조회 ${new Date(p.generatedAt).toLocaleTimeString('ko-KR')}`;
+
+  // 일별 (최근 7일, 빈 날 채움)
+  const days = fillDays(
+    byDate.map(([date, v]) => ({ date, total: v.tokens, requests: v.calls })),
+    Math.min(7, Math.max(1, byDate.length))
+  );
+  if (state.planDailyChart) state.planDailyChart.destroy();
+  state.planDailyChart = new Chart(document.getElementById('plan-daily-chart'), {
+    type: 'bar',
+    data: {
+      labels: days.map((d) => d.date.slice(5)),
+      datasets: [{ label: '계정 총 토큰', backgroundColor: PLAN_COLOR, data: days.map((d) => d.total) }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      onClick: (_, els) => {
+        if (els.length) {
+          state.planSelectedDate = days[els[0].index].date;
+          renderPlanHourly();
+        }
+      },
+      plugins: {
+        title: { display: true, text: '일별 (계정)', color: '#8b93a7' },
+        legend: { display: false },
+        tooltip: { callbacks: { label: (c) => ` ${fmt(c.parsed.y)} tokens` } },
+      },
+      scales: {
+        x: { grid: { color: '#262b38' }, ticks: { color: '#8b93a7' } },
+        y: { grid: { color: '#262b38' }, ticks: { color: '#8b93a7', callback: fmtCompact } },
+      },
+    },
+  });
+
+  renderPlanHourly();
+}
+
+function renderPlanHourly() {
+  const byDate = planByDate();
+  const date = state.planSelectedDate ?? dateKey(new Date());
+  state.planSelectedDate = date;
+  const hours = byDate.find(([d]) => d === date)?.[1].hours ?? Array.from({ length: 24 }, () => ({ tokens: 0, calls: 0 }));
+
+  if (state.planHourlyChart) state.planHourlyChart.destroy();
+  state.planHourlyChart = new Chart(document.getElementById('plan-hourly-chart'), {
+    type: 'bar',
+    data: {
+      labels: hours.map((_, i) => `${String(i).padStart(2, '0')}시`),
+      datasets: [{ label: '계정 총 토큰', backgroundColor: '#0891b2', data: hours.map((h) => h.tokens) }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        title: { display: true, text: `시간별 · ${date} (계정, 클릭한 날짜)`, color: '#8b93a7' },
+        legend: { display: false },
+        tooltip: { callbacks: { footer: (items) => `호출 ${fmt(hours[items[0].dataIndex].calls)}회` } },
+      },
+      scales: {
+        x: { grid: { color: '#262b38' }, ticks: { color: '#8b93a7' } },
+        y: { grid: { color: '#262b38' }, ticks: { color: '#8b93a7', callback: fmtCompact } },
+      },
+    },
+  });
+}
+
+async function loadPlan() {
+  try {
+    const res = await fetch('/api/plan');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    state.plan = await res.json();
+    renderPlan();
+  } catch {
+    document.getElementById('plan-panel').hidden = true;
+  }
+}
+
 // ---------- data ----------
 async function load({ refresh = false } = {}) {
   const btn = document.getElementById('refresh-btn');
@@ -310,4 +438,6 @@ document.getElementById('hourly-date').addEventListener('change', (e) => {
 });
 
 load();
+loadPlan();
 setInterval(() => load({ refresh: true }), 5 * 60 * 1000);
+setInterval(loadPlan, 5 * 60 * 1000);

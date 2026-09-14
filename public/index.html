@@ -21,6 +21,18 @@
 
   <section id="cards" class="cards"></section>
 
+  <section class="panel" id="plan-panel" hidden>
+    <div class="panel-head">
+      <h2>🌐 계정 기반 사용량 (Z.ai · 전체 머신 합산)</h2>
+      <span class="muted" id="plan-meta"></span>
+    </div>
+    <div class="cards plan-cards" id="plan-cards"></div>
+    <div class="grid-2">
+      <div class="chart-wrap tall"><canvas id="plan-daily-chart"></canvas></div>
+      <div class="chart-wrap tall"><canvas id="plan-hourly-chart"></canvas></div>
+    </div>
+  </section>
+
   <section class="panel">
     <div class="panel-head">
       <h2>일별 사용량 (최근 30일)</h2>
