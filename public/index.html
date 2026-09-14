@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GLM Token Tracker</title>
+  <link rel="stylesheet" href="/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>📊 GLM Token Tracker</h1>
+    <div class="header-controls">
+      <span id="last-collected" class="muted"></span>
+      <label class="toggle">
+        <input type="checkbox" id="include-cache" /> 캐시 토큰 포함
+      </label>
+      <button id="refresh-btn">🔄 새로고침</button>
+    </div>
+  </header>
+
+  <section id="cards" class="cards"></section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>일별 사용량 (최근 30일)</h2>
+      <span class="hint muted">막대를 클릭하면 시간별 그래프로 이동합니다</span>
+    </div>
+    <div class="chart-wrap tall"><canvas id="daily-chart"></canvas></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>시간별 사용량 — <span id="hourly-date-label"></span></h2>
+      <input type="date" id="hourly-date" />
+    </div>
+    <div class="chart-wrap tall"><canvas id="hourly-chart"></canvas></div>
+  </section>
+
+  <div class="grid-2">
+    <section class="panel">
+      <div class="panel-head"><h2>모델별 사용량</h2></div>
+      <div class="chart-wrap"><canvas id="model-chart"></canvas></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2>소스별 사용량</h2></div>
+      <div class="chart-wrap"><canvas id="source-chart"></canvas></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="panel-head"><h2>상세 내역</h2></div>
+    <div class="table-wrap">
+      <table id="detail-table">
+        <thead>
+          <tr>
+            <th>모델</th><th>요청 수</th><th>Input</th><th>Output</th><th>Reasoning</th>
+            <th>Cache Read</th><th>Cache Write</th><th>합계</th><th>비중</th><th>소스</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="muted">
+    소스: opencode (<code>~/.local/share/opencode/opencode.db</code>) ·
+    pi coding agent (<code>~/.pi/agent/sessions/</code>) · 5분마다 자동 갱신
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>

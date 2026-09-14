@@ -1,0 +1,14 @@
+{
+  "name": "glm-tracker",
+  "version": "0.1.0",
+  "description": "GLM token usage tracker for opencode & pi coding agent",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server.mjs",
+    "collect": "node lib/collect.mjs"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}
